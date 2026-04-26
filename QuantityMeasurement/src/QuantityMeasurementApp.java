@@ -5,7 +5,7 @@ public class QuantityMeasurementApp {
         FEET(1.0),
         INCHES(1.0 / 12.0),
         YARDS(3.0),
-        CENTIMETERS(0.0328084); // 1 cm = 0.0328084 feet
+        CENTIMETERS(0.0328084);
 
         private final double toFeetFactor;
 
@@ -44,7 +44,7 @@ public class QuantityMeasurementApp {
             return targetUnit.fromFeet(valueInFeet);
         }
 
-        // STATIC conversion API (UC5 requirement)
+        // STATIC conversion API (UC5)
         public static double convert(double value, LengthUnit source, LengthUnit target) {
             if (source == null || target == null) {
                 throw new IllegalArgumentException("Units cannot be null");
@@ -55,6 +55,22 @@ public class QuantityMeasurementApp {
 
             double valueInFeet = source.toFeet(value);
             return target.fromFeet(valueInFeet);
+        }
+
+        // ✅ UC6 ADD METHOD (CORRECT PLACE)
+        public Quantity add(Quantity other) {
+            if (other == null) {
+                throw new IllegalArgumentException("Other quantity cannot be null");
+            }
+
+            double thisInFeet = this.unit.toFeet(this.value);
+            double otherInFeet = other.unit.toFeet(other.value);
+
+            double sumInFeet = thisInFeet + otherInFeet;
+
+            double resultValue = this.unit.fromFeet(sumInFeet);
+
+            return new Quantity(resultValue, this.unit);
         }
 
         // Equality check
@@ -77,16 +93,19 @@ public class QuantityMeasurementApp {
         }
     }
 
-    // MAIN METHOD
+    // ✅ SINGLE MAIN METHOD
     public static void main(String[] args) {
 
+        // UC5 demo
         System.out.println("Feet → Inches: " +
                 Quantity.convert(1.0, LengthUnit.FEET, LengthUnit.INCHES));
 
-        System.out.println("Yards → Feet: " +
-                Quantity.convert(3.0, LengthUnit.YARDS, LengthUnit.FEET));
+        // UC6 demo
+        Quantity q1 = new Quantity(1.0, LengthUnit.FEET);
+        Quantity q2 = new Quantity(12.0, LengthUnit.INCHES);
 
-        System.out.println("CM → Inches: " +
-                Quantity.convert(1.0, LengthUnit.CENTIMETERS, LengthUnit.INCHES));
+        Quantity result = q1.add(q2);
+
+        System.out.println("Addition Result: " + result); // 2.0 FEET
     }
 }

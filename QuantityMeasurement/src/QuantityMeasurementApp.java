@@ -1,81 +1,21 @@
 public class QuantityMeasurementApp {
 
-    // -------------------------
-    // INTERFACE (UC10)
-    // -------------------------
+    // ================= INTERFACE =================
     interface IMeasurable {
         double getConversionFactor();
-        double convertToBaseUnit(double value);
-        double convertFromBaseUnit(double baseValue);
+
+        default double convertToBaseUnit(double value) {
+            return value * getConversionFactor();
+        }
+
+        default double convertFromBaseUnit(double baseValue) {
+            return baseValue / getConversionFactor();
+        }
+
         String getUnitName();
     }
 
-    // -------------------------
-    // LENGTH UNIT
-    // -------------------------
-    enum LengthUnit implements IMeasurable {
-        FEET(1.0),
-        INCHES(1.0 / 12.0),
-        YARDS(3.0),
-        CENTIMETERS(0.0328084);
-
-        private final double factor;
-
-        LengthUnit(double factor) {
-            this.factor = factor;
-        }
-
-        public double getConversionFactor() {
-            return factor;
-        }
-
-        public double convertToBaseUnit(double value) {
-            return value * factor;
-        }
-
-        public double convertFromBaseUnit(double baseValue) {
-            return baseValue / factor;
-        }
-
-        public String getUnitName() {
-            return name();
-        }
-    }
-
-    // -------------------------
-    // WEIGHT UNIT
-    // -------------------------
-    enum WeightUnit implements IMeasurable {
-        KILOGRAM(1.0),
-        GRAM(0.001),
-        POUND(0.453592);
-
-        private final double factor;
-
-        WeightUnit(double factor) {
-            this.factor = factor;
-        }
-
-        public double getConversionFactor() {
-            return factor;
-        }
-
-        public double convertToBaseUnit(double value) {
-            return value * factor;
-        }
-
-        public double convertFromBaseUnit(double baseValue) {
-            return baseValue / factor;
-        }
-
-        public String getUnitName() {
-            return name();
-        }
-    }
-
-    // -------------------------
-    // VOLUME UNIT (UC11)
-    // -------------------------
+    // ================= VOLUME UNIT =================
     enum VolumeUnit implements IMeasurable {
         LITRE(1.0),
         MILLILITRE(0.001),
@@ -91,12 +31,24 @@ public class QuantityMeasurementApp {
             return factor;
         }
 
-        public double convertToBaseUnit(double value) {
-            return value * factor;
+        public String getUnitName() {
+            return name();
+        }
+    }
+
+    // ================= WEIGHT UNIT =================
+    enum WeightUnit implements IMeasurable {
+        KILOGRAM(1.0),
+        GRAM(0.001);
+
+        private final double factor;
+
+        WeightUnit(double factor) {
+            this.factor = factor;
         }
 
-        public double convertFromBaseUnit(double baseValue) {
-            return baseValue / factor;
+        public double getConversionFactor() {
+            return factor;
         }
 
         public String getUnitName() {
@@ -104,9 +56,27 @@ public class QuantityMeasurementApp {
         }
     }
 
-    // -------------------------
-    // GENERIC QUANTITY (UC10)
-    // -------------------------
+    // ================= LENGTH UNIT =================
+    enum LengthUnit implements IMeasurable {
+        FEET(1.0),
+        INCHES(1.0 / 12.0);
+
+        private final double factor;
+
+        LengthUnit(double factor) {
+            this.factor = factor;
+        }
+
+        public double getConversionFactor() {
+            return factor;
+        }
+
+        public String getUnitName() {
+            return name();
+        }
+    }
+
+    // ================= GENERIC QUANTITY =================
     static class Quantity<U extends IMeasurable> {
 
         private final double value;
@@ -115,9 +85,6 @@ public class QuantityMeasurementApp {
         public Quantity(double value, U unit) {
             if (unit == null)
                 throw new IllegalArgumentException("Unit cannot be null");
-
-            if (!Double.isFinite(value))
-                throw new IllegalArgumentException("Invalid value");
 
             this.value = value;
             this.unit = unit;
@@ -131,28 +98,15 @@ public class QuantityMeasurementApp {
             return unit;
         }
 
-        public Quantity<U> convertTo(U targetUnit) {
-            double base = unit.convertToBaseUnit(value);
-            double result = targetUnit.convertFromBaseUnit(base);
-            return new Quantity<>(result, targetUnit);
+        private void validate(Quantity<U> other) {
+            if (other == null)
+                throw new IllegalArgumentException("Quantity cannot be null");
+
+            if (!this.unit.getClass().equals(other.unit.getClass()))
+                throw new IllegalArgumentException("Different measurement categories");
         }
 
-        public Quantity<U> add(Quantity<U> other) {
-            double base1 = unit.convertToBaseUnit(value);
-            double base2 = other.unit.convertToBaseUnit(other.value);
-            double sum = base1 + base2;
-            double result = unit.convertFromBaseUnit(sum);
-            return new Quantity<>(result, unit);
-        }
-
-        public Quantity<U> add(Quantity<U> other, U targetUnit) {
-            double base1 = unit.convertToBaseUnit(value);
-            double base2 = other.unit.convertToBaseUnit(other.value);
-            double sum = base1 + base2;
-            double result = targetUnit.convertFromBaseUnit(sum);
-            return new Quantity<>(result, targetUnit);
-        }
-
+        // ===== EQUALS =====
         @Override
         public boolean equals(Object obj) {
             if (this == obj) return true;
@@ -161,31 +115,103 @@ public class QuantityMeasurementApp {
             if (!this.unit.getClass().equals(other.unit.getClass()))
                 return false;
 
-            double v1 = unit.convertToBaseUnit(value);
-            double v2 = ((IMeasurable) other.unit).convertToBaseUnit(other.value);
+            double base1 = unit.convertToBaseUnit(value);
+            double base2 = ((IMeasurable) other.unit).convertToBaseUnit(other.value);
 
-            return Math.abs(v1 - v2) < 0.0001;
+            return Math.abs(base1 - base2) < 0.0001;
+        }
+
+        // ===== CONVERT =====
+        public Quantity<U> convertTo(U targetUnit) {
+            if (targetUnit == null)
+                throw new IllegalArgumentException("Target unit null");
+
+            double base = unit.convertToBaseUnit(value);
+            double result = targetUnit.convertFromBaseUnit(base);
+
+            return new Quantity<>(round(result), targetUnit);
+        }
+
+        // ===== ADD =====
+        public Quantity<U> add(Quantity<U> other) {
+            return add(other, this.unit);
+        }
+
+        public Quantity<U> add(Quantity<U> other, U targetUnit) {
+            validate(other);
+
+            double base1 = unit.convertToBaseUnit(value);
+            double base2 = other.unit.convertToBaseUnit(other.value);
+
+            double resultBase = base1 + base2;
+            double result = targetUnit.convertFromBaseUnit(resultBase);
+
+            return new Quantity<>(round(result), targetUnit);
+        }
+
+        // ===== SUBTRACT (UC12) =====
+        public Quantity<U> subtract(Quantity<U> other) {
+            return subtract(other, this.unit);
+        }
+
+        public Quantity<U> subtract(Quantity<U> other, U targetUnit) {
+            validate(other);
+
+            if (targetUnit == null)
+                throw new IllegalArgumentException("Target unit null");
+
+            double base1 = unit.convertToBaseUnit(value);
+            double base2 = other.unit.convertToBaseUnit(other.value);
+
+            double resultBase = base1 - base2;
+            double result = targetUnit.convertFromBaseUnit(resultBase);
+
+            return new Quantity<>(round(result), targetUnit);
+        }
+
+        // ===== DIVIDE (UC12) =====
+        public double divide(Quantity<U> other) {
+            validate(other);
+
+            double base1 = unit.convertToBaseUnit(value);
+            double base2 = other.unit.convertToBaseUnit(other.value);
+
+            if (base2 == 0)
+                throw new ArithmeticException("Division by zero");
+
+            return base1 / base2;
+        }
+
+        // ===== ROUND =====
+        private double round(double val) {
+            return Math.round(val * 100.0) / 100.0;
+        }
+
+        @Override
+        public String toString() {
+            return value + " " + unit.getUnitName();
         }
     }
 
-    // -------------------------
-    // MAIN METHOD (DEMO)
-    // -------------------------
+    // ================= MAIN METHOD =================
     public static void main(String[] args) {
 
-        // LENGTH
-        var l1 = new Quantity<>(1.0, LengthUnit.FEET);
-        var l2 = new Quantity<>(12.0, LengthUnit.INCHES);
-        System.out.println(l1.equals(l2)); // true
+        Quantity<VolumeUnit> v1 = new Quantity<>(5.0, VolumeUnit.LITRE);
+        Quantity<VolumeUnit> v2 = new Quantity<>(500.0, VolumeUnit.MILLILITRE);
 
-        // WEIGHT
-        var w1 = new Quantity<>(1.0, WeightUnit.KILOGRAM);
-        var w2 = new Quantity<>(1000.0, WeightUnit.GRAM);
-        System.out.println(w1.equals(w2)); // true
+        System.out.println("=== ADD ===");
+        System.out.println(v1.add(v2)); // 5.5 L
 
-        // VOLUME
-        var v1 = new Quantity<>(1.0, VolumeUnit.LITRE);
-        var v2 = new Quantity<>(1000.0, VolumeUnit.MILLILITRE);
-        System.out.println(v1.equals(v2)); // true
+        System.out.println("=== SUBTRACT ===");
+        System.out.println(v1.subtract(v2)); // 4.5 L
+
+        System.out.println("=== DIVIDE ===");
+        System.out.println(v1.divide(v2)); // 10
+
+        System.out.println("=== CONVERT ===");
+        System.out.println(v1.convertTo(VolumeUnit.MILLILITRE)); // 5000 mL
+
+        System.out.println("=== EQUALS ===");
+        System.out.println(v1.equals(new Quantity<>(5000, VolumeUnit.MILLILITRE))); // true
     }
 }

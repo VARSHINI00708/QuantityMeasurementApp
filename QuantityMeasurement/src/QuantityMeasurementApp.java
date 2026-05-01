@@ -1,8 +1,8 @@
 public class QuantityMeasurementApp {
 
-    // ============================
-    // UC10: COMMON INTERFACE
-    // ============================
+    // -------------------------
+    // INTERFACE (UC10)
+    // -------------------------
     interface IMeasurable {
         double getConversionFactor();
         double convertToBaseUnit(double value);
@@ -10,9 +10,9 @@ public class QuantityMeasurementApp {
         String getUnitName();
     }
 
-    // ============================
-    // LENGTH UNIT (UC8 + UC10)
-    // ============================
+    // -------------------------
+    // LENGTH UNIT
+    // -------------------------
     enum LengthUnit implements IMeasurable {
         FEET(1.0),
         INCHES(1.0 / 12.0),
@@ -42,9 +42,9 @@ public class QuantityMeasurementApp {
         }
     }
 
-    // ============================
-    // WEIGHT UNIT (UC9 + UC10)
-    // ============================
+    // -------------------------
+    // WEIGHT UNIT
+    // -------------------------
     enum WeightUnit implements IMeasurable {
         KILOGRAM(1.0),
         GRAM(0.001),
@@ -73,21 +73,52 @@ public class QuantityMeasurementApp {
         }
     }
 
-    // ============================
-    // GENERIC QUANTITY CLASS (UC10)
-    // ============================
+    // -------------------------
+    // VOLUME UNIT (UC11)
+    // -------------------------
+    enum VolumeUnit implements IMeasurable {
+        LITRE(1.0),
+        MILLILITRE(0.001),
+        GALLON(3.78541);
+
+        private final double factor;
+
+        VolumeUnit(double factor) {
+            this.factor = factor;
+        }
+
+        public double getConversionFactor() {
+            return factor;
+        }
+
+        public double convertToBaseUnit(double value) {
+            return value * factor;
+        }
+
+        public double convertFromBaseUnit(double baseValue) {
+            return baseValue / factor;
+        }
+
+        public String getUnitName() {
+            return name();
+        }
+    }
+
+    // -------------------------
+    // GENERIC QUANTITY (UC10)
+    // -------------------------
     static class Quantity<U extends IMeasurable> {
 
         private final double value;
         private final U unit;
 
         public Quantity(double value, U unit) {
-            if (unit == null) {
+            if (unit == null)
                 throw new IllegalArgumentException("Unit cannot be null");
-            }
-            if (!Double.isFinite(value)) {
+
+            if (!Double.isFinite(value))
                 throw new IllegalArgumentException("Invalid value");
-            }
+
             this.value = value;
             this.unit = unit;
         }
@@ -100,106 +131,61 @@ public class QuantityMeasurementApp {
             return unit;
         }
 
-        // ============================
-        // CONVERSION
-        // ============================
         public Quantity<U> convertTo(U targetUnit) {
-            if (targetUnit == null) {
-                throw new IllegalArgumentException("Target unit cannot be null");
-            }
-
             double base = unit.convertToBaseUnit(value);
-            double converted = targetUnit.convertFromBaseUnit(base);
-
-            return new Quantity<>(round(converted), targetUnit);
+            double result = targetUnit.convertFromBaseUnit(base);
+            return new Quantity<>(result, targetUnit);
         }
 
-        // ============================
-        // ADD (UC6)
-        // ============================
         public Quantity<U> add(Quantity<U> other) {
-            return add(other, this.unit);
+            double base1 = unit.convertToBaseUnit(value);
+            double base2 = other.unit.convertToBaseUnit(other.value);
+            double sum = base1 + base2;
+            double result = unit.convertFromBaseUnit(sum);
+            return new Quantity<>(result, unit);
         }
 
-        // ============================
-        // ADD WITH TARGET (UC7)
-        // ============================
         public Quantity<U> add(Quantity<U> other, U targetUnit) {
-            if (other == null) {
-                throw new IllegalArgumentException("Other cannot be null");
-            }
-            if (targetUnit == null) {
-                throw new IllegalArgumentException("Target unit cannot be null");
-            }
-
-            double thisBase = unit.convertToBaseUnit(value);
-            double otherBase = other.unit.convertToBaseUnit(other.value);
-
-            double sum = thisBase + otherBase;
+            double base1 = unit.convertToBaseUnit(value);
+            double base2 = other.unit.convertToBaseUnit(other.value);
+            double sum = base1 + base2;
             double result = targetUnit.convertFromBaseUnit(sum);
-
-            return new Quantity<>(round(result), targetUnit);
+            return new Quantity<>(result, targetUnit);
         }
 
-        // ============================
-        // EQUALITY
-        // ============================
         @Override
         public boolean equals(Object obj) {
             if (this == obj) return true;
-            if (obj == null || getClass() != obj.getClass()) return false;
+            if (!(obj instanceof Quantity<?> other)) return false;
 
-            Quantity<?> other = (Quantity<?>) obj;
-
-            // Prevent cross-category comparison
-            if (!this.unit.getClass().equals(other.unit.getClass())) {
+            if (!this.unit.getClass().equals(other.unit.getClass()))
                 return false;
-            }
 
-            double thisBase = unit.convertToBaseUnit(value);
-            double otherBase = other.unit.convertToBaseUnit(other.value);
+            double v1 = unit.convertToBaseUnit(value);
+            double v2 = ((IMeasurable) other.unit).convertToBaseUnit(other.value);
 
-            return Double.compare(thisBase, otherBase) == 0;
-        }
-
-        @Override
-        public int hashCode() {
-            return Double.hashCode(unit.convertToBaseUnit(value));
-        }
-
-        @Override
-        public String toString() {
-            return value + " " + unit.getUnitName();
-        }
-
-        private double round(double value) {
-            return Math.round(value * 100.0) / 100.0;
+            return Math.abs(v1 - v2) < 0.0001;
         }
     }
 
-    // ============================
+    // -------------------------
     // MAIN METHOD (DEMO)
-    // ============================
+    // -------------------------
     public static void main(String[] args) {
 
-        // ===== LENGTH =====
-        Quantity<LengthUnit> l1 = new Quantity<>(1.0, LengthUnit.FEET);
-        Quantity<LengthUnit> l2 = new Quantity<>(12.0, LengthUnit.INCHES);
+        // LENGTH
+        var l1 = new Quantity<>(1.0, LengthUnit.FEET);
+        var l2 = new Quantity<>(12.0, LengthUnit.INCHES);
+        System.out.println(l1.equals(l2)); // true
 
-        System.out.println("Length Equality: " + l1.equals(l2));
-        System.out.println("Length Convert: " + l1.convertTo(LengthUnit.INCHES));
-        System.out.println("Length Add (FEET): " + l1.add(l2, LengthUnit.FEET));
-        System.out.println("Length Add (YARDS): " + l1.add(l2, LengthUnit.YARDS));
+        // WEIGHT
+        var w1 = new Quantity<>(1.0, WeightUnit.KILOGRAM);
+        var w2 = new Quantity<>(1000.0, WeightUnit.GRAM);
+        System.out.println(w1.equals(w2)); // true
 
-        // ===== WEIGHT =====
-        Quantity<WeightUnit> w1 = new Quantity<>(1.0, WeightUnit.KILOGRAM);
-        Quantity<WeightUnit> w2 = new Quantity<>(1000.0, WeightUnit.GRAM);
-
-        System.out.println("Weight Equality: " + w1.equals(w2));
-        System.out.println("Weight Convert: " + w1.convertTo(WeightUnit.GRAM));
-        System.out.println("Weight Add (KG): " + w1.add(w2, WeightUnit.KILOGRAM));
-
-        // ===== CROSS CATEGORY (SAFE) =====
-        System.out.println("Cross Category Equality: " + l1.equals(w1)); // false
+        // VOLUME
+        var v1 = new Quantity<>(1.0, VolumeUnit.LITRE);
+        var v2 = new Quantity<>(1000.0, VolumeUnit.MILLILITRE);
+        System.out.println(v1.equals(v2)); // true
     }
 }
